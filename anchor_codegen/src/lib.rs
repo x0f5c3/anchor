@@ -46,6 +46,8 @@ pub struct ConfigBuilder {
     entries: Vec<(PathBuf, Vec<Ident>)>,
     version: Option<String>,
     build_versions: Option<String>,
+    app: Option<String>,
+    license: Option<String>,
     skip_commands: BTreeSet<String>,
 }
 
@@ -96,6 +98,20 @@ impl ConfigBuilder {
         self
     }
 
+    /// Sets the application name that will be placed in the dictionary
+    ///
+    /// Klipper uses "Klipper" here. Custom firmware should set their own name.
+    pub fn set_app(mut self, app: impl AsRef<str>) -> Self {
+        self.app = Some(app.as_ref().into());
+        self
+    }
+
+    /// Sets the license string that will be placed in the dictionary
+    pub fn set_license(mut self, license: impl AsRef<str>) -> Self {
+        self.license = Some(license.as_ref().into());
+        self
+    }
+
     /// Ignores the `klipper_command` with a given name
     ///
     /// This can be used for disabling certain commands in specific builds. Generally it is
@@ -128,6 +144,12 @@ impl ConfigBuilder {
         }
         if let Some(s) = self.build_versions {
             processor.dictionary.build_versions = s;
+        }
+        if let Some(s) = self.app {
+            processor.dictionary.app = s;
+        }
+        if let Some(s) = self.license {
+            processor.dictionary.license = s;
         }
 
         processor.add_identify();
@@ -229,6 +251,10 @@ impl StaticStringsTracker {
 struct Dictionary {
     build_versions: String,
     version: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    app: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    license: String,
 
     config: BTreeMap<String, serde_json::Value>,
     commands: BTreeMap<String, i16>,
