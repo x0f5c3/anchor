@@ -47,6 +47,45 @@ impl<T: ShutdownState> ShutdownState for &mut T {
     }
 }
 
+#[cfg(test)]
+mod shutdown_tests {
+    use super::ShutdownState;
+
+    struct MockContext {
+        shutdown: bool,
+    }
+
+    impl ShutdownState for MockContext {
+        fn is_shutdown(&self) -> bool {
+            self.shutdown
+        }
+    }
+
+    #[test]
+    fn unit_type_never_shutdown() {
+        assert!(!().is_shutdown());
+    }
+
+    #[test]
+    fn mock_not_shutdown() {
+        let ctx = MockContext { shutdown: false };
+        assert!(!ctx.is_shutdown());
+    }
+
+    #[test]
+    fn mock_shutdown() {
+        let ctx = MockContext { shutdown: true };
+        assert!(ctx.is_shutdown());
+    }
+
+    #[test]
+    fn mut_ref_delegates_to_inner() {
+        let mut ctx = MockContext { shutdown: true };
+        let r: &mut MockContext = &mut ctx;
+        assert!(r.is_shutdown());
+    }
+}
+
 pub trait Config {
     type TransportOutput: TransportOutput;
     type Context<'c>: ShutdownState;
