@@ -27,9 +27,29 @@ fn crc16(buf: &[u8]) -> u16 {
     crc
 }
 
+/// Trait for context types that can report MCU shutdown state.
+///
+/// When the MCU is in shutdown, commands not marked with `in_shutdown`
+/// are silently dropped by the generated dispatcher.
+pub trait ShutdownState {
+    fn is_shutdown(&self) -> bool;
+}
+
+impl ShutdownState for () {
+    fn is_shutdown(&self) -> bool {
+        false
+    }
+}
+
+impl<T: ShutdownState> ShutdownState for &mut T {
+    fn is_shutdown(&self) -> bool {
+        (**self).is_shutdown()
+    }
+}
+
 pub trait Config {
     type TransportOutput: TransportOutput;
-    type Context<'c>;
+    type Context<'c>: ShutdownState;
     fn dispatch<'c>(
         cmd: u16,
         frame: &mut &[u8],
