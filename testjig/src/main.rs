@@ -198,7 +198,8 @@ fn get_config() {
 }
 
 #[klipper_command(in_shutdown)]
-fn config_reset() {
+fn clear_shutdown() {
+    // Testjig has no shutdown state — just clear the CRC
     *CONFIG_CRC.lock().unwrap() = None;
 }
 
