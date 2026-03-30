@@ -439,6 +439,22 @@ impl Processor {
     fn process_command(&mut self, func: &ItemFn) -> Result<()> {
         let mut c = parse2::<Command>(func.to_token_stream())?;
         c.module = Some(self.current_module.clone());
+
+        // Check for #[klipper_command(in_shutdown)]
+        for attr in &func.attrs {
+            if path_last_name(&attr.path).is_some_and(|i| i == "klipper_command") {
+                if let Ok(syn::Meta::List(meta)) = attr.parse_meta() {
+                    for nested in &meta.nested {
+                        if let syn::NestedMeta::Meta(syn::Meta::Path(path)) = nested {
+                            if path.is_ident("in_shutdown") {
+                                c.in_shutdown = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if check_is_enabled(&func.attrs) {
             self.add_message(c.name.to_string(), Message::Command(c));
         }
@@ -540,6 +556,7 @@ impl Processor {
                 module: None,
                 handler_name: format_ident!("handle_identify"),
                 has_context: false,
+                in_shutdown: false,
                 args: vec![
                     command::Arg {
                         name: format_ident!("offset"),
