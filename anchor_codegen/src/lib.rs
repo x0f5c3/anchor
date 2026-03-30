@@ -556,7 +556,7 @@ impl Processor {
                 module: None,
                 handler_name: format_ident!("handle_identify"),
                 has_context: false,
-                in_shutdown: false,
+                in_shutdown: true,
                 args: vec![
                     command::Arg {
                         name: format_ident!("offset"),
@@ -728,9 +728,20 @@ impl Processor {
             }
             if let Message::Command(c) = m {
                 let handler = c.handler_fn_name();
-                handlers[id as usize] = Some(quote! {
-                    #id => message_handlers::#handler(frame, context),
-                });
+                if c.in_shutdown {
+                    handlers[id as usize] = Some(quote! {
+                        #id => message_handlers::#handler(frame, context),
+                    });
+                } else {
+                    handlers[id as usize] = Some(quote! {
+                        #id => {
+                            if ::anchor::ShutdownState::is_shutdown(context) {
+                                return Ok(());
+                            }
+                            message_handlers::#handler(frame, context)
+                        }
+                    });
+                }
             }
         }
 
