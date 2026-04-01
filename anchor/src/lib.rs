@@ -31,7 +31,7 @@
 //! Once the dependencies have been added, include a custom build step. This is done by creating
 //! (or modifying the existing) `build.rs` file. This file must exist in the same directory as
 //! `Cargo.toml`. A minimal example:
-//! ```
+//! ```no_run
 //! fn main() {
 //!     anchor_codegen::ConfigBuilder::new()
 //!         .entry("src/main.rs")
@@ -128,6 +128,7 @@
 //! | `finalize_config`| See example                |
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(clippy::needless_doctest_main)]
 
 #[doc(hidden)]
 pub mod encoding;

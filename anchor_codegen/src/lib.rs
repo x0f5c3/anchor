@@ -299,7 +299,7 @@ impl<'ast> Visit<'ast> for Processor {
 
     fn visit_item_fn(&mut self, node: &'ast ItemFn) {
         for attr in &node.attrs {
-            if path_last_name(&attr.path).map_or(false, |i| i == "klipper_command") {
+            if path_last_name(&attr.path).is_some_and(|i| i == "klipper_command") {
                 check_error!(self, self.process_command(node));
                 break;
             }
@@ -312,7 +312,7 @@ impl<'ast> Visit<'ast> for Processor {
 
     fn visit_item_const(&mut self, node: &'ast ItemConst) {
         for attr in &node.attrs {
-            if path_last_name(&attr.path).map_or(false, |i| i == "klipper_constant") {
+            if path_last_name(&attr.path).is_some_and(|i| i == "klipper_constant") {
                 check_error!(self, self.process_constant(node));
                 break;
             }

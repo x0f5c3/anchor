@@ -39,7 +39,7 @@ pub fn check_is_disabled(attrs: &[Attribute]) -> bool {
                 }
             }
             NestedMeta::Meta(Meta::List(m)) if m.path.is_ident("not") => {
-                let sub = m.nested.first().map_or(false, check_expr);
+                let sub = m.nested.first().is_some_and(check_expr);
                 !sub
             }
             NestedMeta::Meta(Meta::List(m)) if m.path.is_ident("all") => {

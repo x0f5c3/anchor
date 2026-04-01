@@ -7,6 +7,12 @@ pub struct FifoBuffer<const BUF_SIZE: usize> {
     used: usize,
 }
 
+impl<const BUF_SIZE: usize> Default for FifoBuffer<BUF_SIZE> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const BUF_SIZE: usize> FifoBuffer<BUF_SIZE> {
     /// Creates a new buffer
     ///

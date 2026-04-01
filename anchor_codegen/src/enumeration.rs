@@ -258,8 +258,9 @@ impl Parse for Enumeration {
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
 enum RenameFormat {
+    #[default]
     None,
     LowerCase,
     UpperCase,
@@ -283,12 +284,6 @@ impl RenameFormat {
                 out
             }
         }
-    }
-}
-
-impl Default for RenameFormat {
-    fn default() -> Self {
-        Self::None
     }
 }
 
