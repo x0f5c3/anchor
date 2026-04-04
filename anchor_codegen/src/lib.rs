@@ -707,7 +707,9 @@ impl Processor {
                     handlers[id as usize] = Some(quote! {
                         #id => {
                             if ::anchor::ShutdownState::is_shutdown(context) {
-                                return Ok(());
+                                // Abort frame parsing — remaining bytes may be
+                                // args for this command, not valid command IDs.
+                                return Err(::anchor::encoding::ReadError);
                             }
                             message_handlers::#handler(frame, context)
                         }
