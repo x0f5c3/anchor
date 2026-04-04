@@ -224,10 +224,9 @@ impl<C: Config> Transport<C> {
                 let changed = output.data_since(cursor).len();
                 let frame_len = changed + MESSAGE_TRAILER_SIZE;
                 if frame_len > MESSAGE_LENGTH_MAX {
-                    // Oversized frame — skip CRC/sync so receiver never
-                    // sees a valid packet. debug_assert catches this in
-                    // development; in release the partial write is harmless
-                    // since no sync byte means the receiver discards it.
+                    // Oversized frame — roll back all bytes written since
+                    // cursor so no partial data leaks into the TX stream.
+                    output.rollback(cursor);
                     debug_assert!(
                         false,
                         "frame length {} exceeds protocol max {}",

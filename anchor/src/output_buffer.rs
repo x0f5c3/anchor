@@ -9,12 +9,15 @@ pub trait OutputBuffer {
     type Cursor: Copy;
     /// Append bytes to the buffer
     fn output(&mut self, buf: &[u8]);
-    /// Retrieve the cursor representing the position of the last appended byte
+    /// Retrieve the cursor representing the current write position
     fn cur_position(&self) -> Self::Cursor;
     /// Replace the byte at the cursor position with a new value
     fn update(&mut self, cursor: Self::Cursor, value: u8);
     /// Retrieve a reference to all data pushed after the cursor
     fn data_since(&self, cursor: Self::Cursor) -> &[u8];
+    /// Roll back write position to a previously saved cursor,
+    /// discarding all bytes written after that point.
+    fn rollback(&mut self, cursor: Self::Cursor);
 }
 
 /// A scratch pad based `OutputBuffer`.
@@ -81,6 +84,12 @@ impl<const MAX_SIZE: usize> OutputBuffer for ScratchOutput<MAX_SIZE> {
             &self.buffer[cursor..self.idx]
         }
     }
+
+    fn rollback(&mut self, cursor: Self::Cursor) {
+        if cursor <= self.idx {
+            self.idx = cursor;
+        }
+    }
 }
 
 #[cfg(feature = "std")]
@@ -101,5 +110,66 @@ impl OutputBuffer for Vec<u8> {
 
     fn data_since(&self, cursor: Self::Cursor) -> &[u8] {
         &self[cursor..]
+    }
+
+    fn rollback(&mut self, cursor: Self::Cursor) {
+        self.truncate(cursor);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scratch_output_rollback_to_start() {
+        let mut buf = ScratchOutput::<64>::new();
+        let cursor = buf.cur_position();
+        buf.output(&[1, 2, 3, 4, 5]);
+        assert_eq!(buf.data_since(cursor).len(), 5);
+        buf.rollback(cursor);
+        assert_eq!(buf.data_since(cursor).len(), 0);
+        assert_eq!(buf.cur_position(), 0);
+    }
+
+    #[test]
+    fn scratch_output_rollback_partial() {
+        let mut buf = ScratchOutput::<64>::new();
+        buf.output(&[1, 2]);
+        let cursor = buf.cur_position();
+        buf.output(&[3, 4, 5]);
+        assert_eq!(buf.cur_position(), 5);
+        buf.rollback(cursor);
+        assert_eq!(buf.cur_position(), 2);
+        assert_eq!(buf.data_since(0), &[1, 2]);
+    }
+
+    #[test]
+    fn scratch_output_rollback_noop_for_future_cursor() {
+        let mut buf = ScratchOutput::<64>::new();
+        buf.output(&[1, 2, 3]);
+        buf.rollback(10); // cursor beyond current position
+        assert_eq!(buf.cur_position(), 3); // unchanged
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn vec_rollback_to_start() {
+        let mut buf: Vec<u8> = Vec::new();
+        let cursor = buf.cur_position();
+        buf.output(&[1, 2, 3]);
+        buf.rollback(cursor);
+        assert!(buf.is_empty());
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn vec_rollback_partial() {
+        let mut buf: Vec<u8> = Vec::new();
+        buf.output(&[1, 2]);
+        let cursor = buf.cur_position();
+        buf.output(&[3, 4, 5]);
+        buf.rollback(cursor);
+        assert_eq!(buf.as_slice(), &[1, 2]);
     }
 }
