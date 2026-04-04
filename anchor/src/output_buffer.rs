@@ -92,7 +92,7 @@ impl OutputBuffer for Vec<u8> {
     }
 
     fn cur_position(&self) -> Self::Cursor {
-        self.len().saturating_sub(1)
+        self.len()
     }
 
     fn update(&mut self, cursor: Self::Cursor, value: u8) {
