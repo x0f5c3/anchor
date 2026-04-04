@@ -605,36 +605,7 @@ impl Processor {
     }
 
     fn convert_id(id: u16) -> i16 {
-        // Encode id using the same signed-VLQ rules Anchor uses at runtime
-        // (encoding.rs encode_vlq_int) so the host and MCU agree on the
-        // exact bytes for this id. The old 2-byte encoding was incorrect
-        // for IDs where the VLQ sign-extension bits diverge.
-        let sv = id as i32;
-        let mut encoded: Vec<u8> = Vec::new();
-        if !(-(1 << 26)..(3 << 26)).contains(&sv) {
-            encoded.push((((sv >> 28) & 0x7F) as u8) | 0x80);
-        }
-        if !(-(1 << 19)..(3 << 19)).contains(&sv) {
-            encoded.push((((sv >> 21) & 0x7F) as u8) | 0x80);
-        }
-        if !(-(1 << 12)..(3 << 12)).contains(&sv) {
-            encoded.push((((sv >> 14) & 0x7F) as u8) | 0x80);
-        }
-        if !(-(1 << 5)..(3 << 5)).contains(&sv) {
-            encoded.push((((sv >> 7) & 0x7F) as u8) | 0x80);
-        }
-        encoded.push((sv & 0x7F) as u8);
-
-        let mut c = encoded[0] as u32;
-        let mut v = c & 0x7F;
-        if (c & 0x60) == 0x60 {
-            v |= (-0x20i32) as u32;
-        }
-        while c & 0x80 != 0 {
-            c = encoded[1] as u32;
-            v = (v << 7) | (c & 0x7F);
-        }
-        v as i16
+        convert_command_id(id)
     }
 
     fn finalize_dictionary(&mut self) {
@@ -902,4 +873,79 @@ impl Processor {
 
 fn path_last_name(path: &syn::Path) -> Option<&Ident> {
     path.get_ident()
+}
+
+/// Encode a command ID using signed-VLQ, then decode back to the i16 that
+/// the host and MCU agree on for the data dictionary.
+fn convert_command_id(id: u16) -> i16 {
+    let sv = id as i32;
+    let mut encoded: Vec<u8> = Vec::new();
+    if !(-(1 << 26)..(3 << 26)).contains(&sv) {
+        encoded.push((((sv >> 28) & 0x7F) as u8) | 0x80);
+    }
+    if !(-(1 << 19)..(3 << 19)).contains(&sv) {
+        encoded.push((((sv >> 21) & 0x7F) as u8) | 0x80);
+    }
+    if !(-(1 << 12)..(3 << 12)).contains(&sv) {
+        encoded.push((((sv >> 14) & 0x7F) as u8) | 0x80);
+    }
+    if !(-(1 << 5)..(3 << 5)).contains(&sv) {
+        encoded.push((((sv >> 7) & 0x7F) as u8) | 0x80);
+    }
+    encoded.push((sv & 0x7F) as u8);
+
+    let mut idx = 0;
+    let mut c = encoded[idx] as u32;
+    let mut v = c & 0x7F;
+    if (c & 0x60) == 0x60 {
+        v |= (-0x20i32) as u32;
+    }
+    while c & 0x80 != 0 {
+        idx += 1;
+        c = encoded[idx] as u32;
+        v = (v << 7) | (c & 0x7F);
+    }
+    v as i16
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn convert_id_single_byte() {
+        // IDs 0..=95 encode to 1 byte (fit in signed 7-bit range)
+        assert_eq!(convert_command_id(0), 0);
+        assert_eq!(convert_command_id(1), 1);
+        assert_eq!(convert_command_id(95), 95);
+    }
+
+    #[test]
+    fn convert_id_two_bytes() {
+        // IDs 96..=127 require 2 bytes
+        assert_eq!(convert_command_id(96), 96);
+        assert_eq!(convert_command_id(127), 127);
+    }
+
+    #[test]
+    fn convert_id_three_bytes() {
+        // IDs >= 128 require 3 bytes — this was the infinite loop case
+        assert_eq!(convert_command_id(128), 128);
+        assert_eq!(convert_command_id(200), 200);
+        assert_eq!(convert_command_id(255), 255);
+        assert_eq!(convert_command_id(1000), 1000);
+    }
+
+    #[test]
+    fn convert_id_roundtrip_exhaustive() {
+        // Verify all u16 IDs that fit in i16 round-trip correctly
+        for id in 0..=32767u16 {
+            let result = convert_command_id(id);
+            assert_eq!(
+                result, id as i16,
+                "convert_command_id({}) returned {} instead of {}",
+                id, result, id as i16
+            );
+        }
+    }
 }
