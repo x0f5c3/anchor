@@ -223,13 +223,19 @@ impl<C: Config> Transport<C> {
             {
                 let changed = output.data_since(cursor).len();
                 let frame_len = changed + MESSAGE_TRAILER_SIZE;
-                debug_assert!(
-                    frame_len <= MESSAGE_LENGTH_MAX,
-                    "frame length {} exceeds protocol max {}",
-                    frame_len,
-                    MESSAGE_LENGTH_MAX
-                );
-                output.update(cursor, frame_len.min(MESSAGE_LENGTH_MAX) as u8);
+                if frame_len > MESSAGE_LENGTH_MAX {
+                    // Oversized frame — skip CRC/sync so receiver never
+                    // sees a valid packet. debug_assert catches this in
+                    // development; in release the partial write is harmless
+                    // since no sync byte means the receiver discards it.
+                    debug_assert!(
+                        false,
+                        "frame length {} exceeds protocol max {}",
+                        frame_len, MESSAGE_LENGTH_MAX
+                    );
+                    return;
+                }
+                output.update(cursor, frame_len as u8);
             }
             let crc = crc16(output.data_since(cursor));
             output.output(&[
