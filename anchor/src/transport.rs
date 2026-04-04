@@ -245,3 +245,119 @@ impl<C: Config> Transport<C> {
         })
     }
 }
+
+#[cfg(test)]
+mod encode_frame_tests {
+    use super::*;
+    use crate::output_buffer::ScratchOutput;
+    use core::cell::{Cell, RefCell};
+
+    /// Captures bytes emitted by encode_frame for test assertions.
+    struct TestOutput {
+        buf: RefCell<[u8; 256]>,
+        len: Cell<usize>,
+    }
+
+    impl TestOutput {
+        fn new() -> Self {
+            Self {
+                buf: RefCell::new([0u8; 256]),
+                len: Cell::new(0),
+            }
+        }
+        fn output_len(&self) -> usize {
+            self.len.get()
+        }
+        fn first_byte(&self) -> u8 {
+            self.buf.borrow()[0]
+        }
+        fn last_byte(&self) -> u8 {
+            let l = self.len.get();
+            if l > 0 {
+                self.buf.borrow()[l - 1]
+            } else {
+                0
+            }
+        }
+    }
+
+    impl TransportOutput for TestOutput {
+        type Output = ScratchOutput<256>;
+        fn output(&self, f: impl FnOnce(&mut Self::Output)) {
+            let mut scratch = ScratchOutput::new();
+            f(&mut scratch);
+            let result = scratch.result();
+            let prev = self.len.get();
+            let copy_len = result.len().min(256 - prev);
+            self.buf.borrow_mut()[prev..prev + copy_len].copy_from_slice(&result[..copy_len]);
+            self.len.set(prev + copy_len);
+        }
+    }
+
+    struct TestConfig;
+
+    impl Config for TestConfig {
+        type TransportOutput = TestOutput;
+        type Context<'c> = ();
+        fn dispatch<'c>(
+            _cmd: u16,
+            _frame: &mut &[u8],
+            _context: &mut Self::Context<'c>,
+        ) -> Result<(), ReadError> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn normal_frame_emits_bytes() {
+        let output = TestOutput::new();
+        let transport = Transport::<TestConfig>::new(&TestConfig, output);
+        transport.encode_frame(|buf| {
+            buf.output(&[0x01, 0x02]); // small payload
+        });
+        assert!(transport.output.output_len() > 0);
+        assert_eq!(transport.output.last_byte(), MESSAGE_VALUE_SYNC);
+    }
+
+    /// Verifies that oversized frames produce zero output bytes after
+    /// rollback. Uses catch_unwind to absorb the debug_assert panic
+    /// so we can inspect output state afterward.
+    #[cfg(feature = "std")]
+    #[test]
+    fn oversized_frame_emits_zero_bytes() {
+        use std::panic::{catch_unwind, AssertUnwindSafe};
+
+        let output = TestOutput::new();
+        let transport = Transport::<TestConfig>::new(&TestConfig, output);
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            transport.encode_frame(|buf| {
+                // 62 bytes payload + 2 header + 3 trailer = 67 > 64
+                buf.output(&[0xAA; 62]);
+            });
+        }));
+        // debug_assert fires in debug builds
+        assert!(
+            result.is_err(),
+            "expected debug_assert panic for oversized frame"
+        );
+        // Rollback ensures zero bytes reached the output
+        assert_eq!(
+            transport.output.output_len(),
+            0,
+            "oversized frame should produce zero output bytes after rollback"
+        );
+    }
+
+    #[test]
+    fn max_valid_frame_emits_bytes() {
+        let output = TestOutput::new();
+        let transport = Transport::<TestConfig>::new(&TestConfig, output);
+        transport.encode_frame(|buf| {
+            // 59 bytes payload + 2 header + 3 trailer = 64 = MESSAGE_LENGTH_MAX
+            buf.output(&[0xBB; 59]);
+        });
+        assert!(transport.output.output_len() > 0);
+        assert_eq!(transport.output.first_byte(), 64); // length = MAX
+        assert_eq!(transport.output.last_byte(), MESSAGE_VALUE_SYNC);
+    }
+}
