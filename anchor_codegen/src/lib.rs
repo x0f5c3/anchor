@@ -11,9 +11,10 @@ use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use syn::{
+    punctuated::Punctuated,
     parse2,
     visit::{self, Visit},
-    Ident, ItemConst, ItemFn, ItemMod, LitInt, LitStr, Macro,
+    Ident, ItemConst, ItemFn, ItemMod, LitInt, LitStr, Macro, Meta, Token,
 };
 
 #[doc(hidden)]
@@ -299,7 +300,7 @@ impl<'ast> Visit<'ast> for Processor {
 
     fn visit_item_fn(&mut self, node: &'ast ItemFn) {
         for attr in &node.attrs {
-            if path_last_name(&attr.path).is_some_and(|i| i == "klipper_command") {
+            if path_last_name(attr.path()).is_some_and(|i| i == "klipper_command") {
                 check_error!(self, self.process_command(node));
                 break;
             }
@@ -312,7 +313,7 @@ impl<'ast> Visit<'ast> for Processor {
 
     fn visit_item_const(&mut self, node: &'ast ItemConst) {
         for attr in &node.attrs {
-            if path_last_name(&attr.path).is_some_and(|i| i == "klipper_constant") {
+            if path_last_name(attr.path()).is_some_and(|i| i == "klipper_constant") {
                 check_error!(self, self.process_constant(node));
                 break;
             }
@@ -442,10 +443,12 @@ impl Processor {
 
         // Check for #[klipper_command(in_shutdown)]
         for attr in &func.attrs {
-            if path_last_name(&attr.path).is_some_and(|i| i == "klipper_command") {
-                if let Ok(syn::Meta::List(meta)) = attr.parse_meta() {
-                    for nested in &meta.nested {
-                        if let syn::NestedMeta::Meta(syn::Meta::Path(path)) = nested {
+            if path_last_name(attr.path()).is_some_and(|i| i == "klipper_command") {
+                if let Ok(items) =
+                    attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+                {
+                    for nested in items {
+                        if let syn::Meta::Path(path) = nested {
                             if path.is_ident("in_shutdown") {
                                 c.in_shutdown = true;
                             }

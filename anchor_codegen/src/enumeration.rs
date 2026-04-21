@@ -6,7 +6,7 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use syn::{
     braced, parenthesized, parse::Parse, parse_str, punctuated::Punctuated, spanned::Spanned,
-    Attribute, Error, Ident, LitInt, Meta, NestedMeta, Token, Type, Visibility,
+    Attribute, Error, Ident, LitInt, Meta, Token, Type, Visibility,
 };
 
 #[derive(Debug, Serialize)]
@@ -34,7 +34,7 @@ impl Enumeration {
         let attrs = self
             .attrs
             .iter()
-            .filter(|a| !a.path.is_ident("klipper_enumeration"));
+            .filter(|a| !a.path().is_ident("klipper_enumeration"));
         let visibility = &self.visibility;
         let enum_token = &self.enum_token;
         let ident = &self.ident;
@@ -94,7 +94,7 @@ impl Enumeration {
                 let attrs = opts
                     .attrs
                     .iter()
-                    .filter(|a| !a.path.is_ident("klipper_enumeration"))
+                    .filter(|a| !a.path().is_ident("klipper_enumeration"))
                     .collect::<Vec<_>>();
                 vec![quote! {
                     #(#attrs)*
@@ -106,7 +106,7 @@ impl Enumeration {
                     let attrs = opts
                         .attrs
                         .iter()
-                        .filter(|a| !a.path.is_ident("klipper_enumeration"))
+                        .filter(|a| !a.path().is_ident("klipper_enumeration"))
                         .collect::<Vec<_>>();
                     let ident = format_ident!("{prefix}{i}");
                     quote! {
@@ -121,7 +121,7 @@ impl Enumeration {
     fn variant_matches(&self) -> Vec<TokenStream> {
         self.numbered_variants()
             .flat_map(|(v, start, cnt)| {
-                let cfg_attrs = v.opts().attrs.iter().filter(|a| a.path.is_ident("cfg"));
+                let cfg_attrs = v.opts().attrs.iter().filter(|a| a.path().is_ident("cfg"));
                 match v {
                     EnumVariant::Single(_, ident) => {
                         let start = TokenStream::from_str(&format!("{start}")).unwrap();
@@ -153,7 +153,7 @@ impl Enumeration {
         let self_ident = &self.ident;
         self.numbered_variants()
             .flat_map(|(v, start, cnt)| {
-                let cfg_attrs = v.opts().attrs.iter().filter(|a| a.path.is_ident("cfg"));
+                let cfg_attrs = v.opts().attrs.iter().filter(|a| a.path().is_ident("cfg"));
                 match v {
                     EnumVariant::Single(_, ident) => {
                         let start = TokenStream::from_str(&format!("{start}")).unwrap();
@@ -245,7 +245,7 @@ impl Parse for Enumeration {
         let content;
         let _brace = braced!(content in input);
         let variants: Punctuated<EnumVariant, Token![,]> =
-            content.parse_terminated(EnumVariant::parse)?;
+            content.parse_terminated(EnumVariant::parse, Token![,])?;
 
         Ok(Enumeration {
             opts: EnumerationOptions::parse(&attrs)?,
@@ -311,32 +311,28 @@ impl EnumerationOptions {
         let mut opts = Self::default();
 
         visit_attribs(attrs, "klipper_enumeration", |meta| match meta {
-            NestedMeta::Meta(Meta::NameValue(m)) if m.path.is_ident("name") => {
-                opts.name = Some(get_lit_str(&m.lit)?.value());
+            Meta::NameValue(m) if m.path.is_ident("name") => {
+                opts.name = Some(get_lit_str(&m.value)?.value());
                 Ok(())
             }
 
-            NestedMeta::Meta(Meta::NameValue(m)) if m.path.is_ident("rename_all") => {
-                let format = get_lit_str(&m.lit)?.value();
+            Meta::NameValue(m) if m.path.is_ident("rename_all") => {
+                let format = get_lit_str(&m.value)?.value();
                 match format.parse() {
                     Ok(format) => {
                         opts.rename_all = format;
                         Ok(())
                     }
-                    Err(()) => Err(Error::new(m.lit.span(), "unknown rename format")),
+                    Err(()) => Err(Error::new(m.value.span(), "unknown rename format")),
                 }
             }
 
-            NestedMeta::Meta(item) => Err(Error::new(
+            item => Err(Error::new(
                 item.span(),
                 format!(
                     "unknown variant attribute '{}'",
                     item.path().into_token_stream().to_string().replace(' ', "")
                 ),
-            )),
-            NestedMeta::Lit(lit) => Err(Error::new(
-                lit.span(),
-                "unexpected literal in variant attribute",
             )),
         })?;
 
@@ -402,21 +398,17 @@ impl EnumVariantOpts {
         }
 
         visit_attribs(&opts.attrs, "klipper_enumeration", |meta| match meta {
-            NestedMeta::Meta(Meta::NameValue(m)) if m.path.is_ident("rename") => {
-                opts.rename = Some(get_lit_str(&m.lit)?.value());
+            Meta::NameValue(m) if m.path.is_ident("rename") => {
+                opts.rename = Some(get_lit_str(&m.value)?.value());
                 Ok(())
             }
 
-            NestedMeta::Meta(item) => Err(Error::new(
+            item => Err(Error::new(
                 item.span(),
                 format!(
                     "unknown variant attribute '{}'",
                     item.path().into_token_stream().to_string().replace(' ', "")
                 ),
-            )),
-            NestedMeta::Lit(lit) => Err(Error::new(
-                lit.span(),
-                "unexpected literal in variant attribute",
             )),
         })?;
 

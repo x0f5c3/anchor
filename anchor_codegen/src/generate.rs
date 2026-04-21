@@ -27,7 +27,7 @@ impl Parse for GenerateConfig {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut transport = None;
         let mut context = Type::Tuple(TypeTuple {
-            paren_token: Paren { span: input.span() },
+            paren_token: Paren::default(),
             elems: Punctuated::new(),
         });
 
