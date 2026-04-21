@@ -11,8 +11,8 @@ use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use syn::{
-    punctuated::Punctuated,
     parse2,
+    punctuated::Punctuated,
     visit::{self, Visit},
     Ident, ItemConst, ItemFn, ItemMod, LitInt, LitStr, Macro, Meta, Token,
 };
