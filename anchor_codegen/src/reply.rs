@@ -55,7 +55,7 @@ impl Parse for Reply {
             let mut first = true;
             while !content.is_empty() {
                 if !first {
-                    input.parse::<Comma>()?;
+                    content.parse::<Comma>()?;
                 }
                 first = false;
                 let attrib_name: Ident = content.parse()?;
@@ -91,5 +91,43 @@ impl Parse for Reply {
             args.push(Arg { name, type_, value });
         }
         Ok(Reply { name, id, args })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Reply;
+    use syn::parse_str;
+
+    #[test]
+    fn parse_reply_with_id_attribute() {
+        let r = parse_str::<Reply>(r#"foo[id=7], value: u32"#).unwrap();
+        assert_eq!(r.id, Some(7));
+        assert_eq!(r.args.len(), 1);
+    }
+
+    #[test]
+    fn parse_reply_rejects_unknown_attribute() {
+        let err = parse_str::<Reply>(r#"foo[bad=1], value: u32"#).unwrap_err();
+        assert!(
+            err.to_string().contains("Unknown attribute"),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn parse_reply_accepts_multiple_attributes_of_same_kind() {
+        // "id" is currently the only supported attribute; repeated entries
+        // are parsed in-order and the last value wins.
+        let r = parse_str::<Reply>(r#"foo[id=7, id=8], value: u32"#).unwrap();
+        assert_eq!(r.id, Some(8));
+        assert_eq!(r.args.len(), 1);
+    }
+
+    #[test]
+    fn parse_reply_rejects_missing_comma_in_attribute_list() {
+        let err = parse_str::<Reply>(r#"foo[id=1 id2=2], value: u32"#).unwrap_err();
+        assert!(!err.to_string().is_empty());
     }
 }

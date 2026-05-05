@@ -30,6 +30,7 @@ pub struct Command {
     pub handler_name: Ident,
     pub module: Option<Vec<Ident>>,
     pub has_context: bool,
+    pub in_shutdown: bool,
     pub args: Vec<Arg>,
 }
 
@@ -111,6 +112,7 @@ impl Parse for Command {
             handler_name: name,
             id: None,
             has_context,
+            in_shutdown: false,
             args,
         })
     }

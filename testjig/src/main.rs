@@ -168,24 +168,24 @@ fn cur_clock() -> u32 {
     (c & 0xFFFFFFFF) as u32
 }
 
-#[klipper_command]
+#[klipper_command(in_shutdown)]
 fn get_uptime(_context: &()) {
     klipper_reply!(uptime, high: u32 = 2, clock: u32 = cur_clock());
 }
 
-#[klipper_command]
+#[klipper_command(in_shutdown)]
 fn get_clock() {
     klipper_reply!(clock, clock: u32 = cur_clock());
 }
 
-#[klipper_command]
+#[klipper_command(in_shutdown)]
 fn emergency_stop() {}
 
 lazy_static! {
     static ref CONFIG_CRC: Mutex<Option<u32>> = Mutex::new(None);
 }
 
-#[klipper_command]
+#[klipper_command(in_shutdown)]
 fn get_config() {
     let crc = CONFIG_CRC.lock().unwrap();
     klipper_reply!(
@@ -197,8 +197,9 @@ fn get_config() {
     );
 }
 
-#[klipper_command]
-fn config_reset() {
+#[klipper_command(in_shutdown)]
+fn clear_shutdown() {
+    // Testjig has no shutdown state — just clear the CRC
     *CONFIG_CRC.lock().unwrap() = None;
 }
 

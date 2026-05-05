@@ -31,7 +31,7 @@
 //! Once the dependencies have been added, include a custom build step. This is done by creating
 //! (or modifying the existing) `build.rs` file. This file must exist in the same directory as
 //! `Cargo.toml`. A minimal example:
-//! ```
+//! ```ignore
 //! fn main() {
 //!     anchor_codegen::ConfigBuilder::new()
 //!         .entry("src/main.rs")
@@ -51,7 +51,7 @@
 //! implementation, which will then be supplied to [`klipper_config_generate`]. This will by
 //! necessity be specific to your project. An example implementation for a USB-based communication
 //! channel could be:
-//! ```
+//! ```ignore
 //! pub static USB_TX_BUFFER: Mutex<RefCell<FifoBuffer<{ USB_MAX_PACKET_SIZE * 2 }>>> =
 //!     Mutex::new(RefCell::new(FifoBuffer::new()));
 //! pub(crate) struct BufferTransportOutput;
@@ -78,7 +78,7 @@
 //!
 //! With the [`TransportOutput`] ready, add the [`klipper_config_generate!`] invocation. Usually
 //! this is best done in the `main.rs` file of the project:
-//! ```
+//! ```ignore
 //! klipper_config_generate!(
 //!   transport = crate::usb::TRANSPORT_OUTPUT: crate::usb::BufferTransportOutput,
 //! );
@@ -91,7 +91,7 @@
 //! generates a `KLIPPER_TRANSPORT` global constant, of type [`Transport`]. To parse incoming
 //! commands, pass received bytes to the `receive` method of this. As with the write path, this
 //! will be specific to your project. An example implementation could be:
-//! ```
+//! ```ignore
 //! // Pump USB read side
 //! let recv_data = receive_buffer.data();
 //! if !recv_data.is_empty() {
@@ -128,6 +128,7 @@
 //! | `finalize_config`| See example                |
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(clippy::needless_doctest_main)]
 
 #[doc(hidden)]
 pub mod encoding;
@@ -147,5 +148,5 @@ pub use anchor_macro::*;
 pub use fifo_buffer::FifoBuffer;
 pub use input_buffer::{InputBuffer, SliceInputBuffer};
 pub use output_buffer::{OutputBuffer, ScratchOutput};
-pub use transport::Transport;
+pub use transport::{ShutdownState, Transport};
 pub use transport_output::TransportOutput;
