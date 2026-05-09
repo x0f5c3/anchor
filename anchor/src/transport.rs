@@ -89,6 +89,19 @@ mod shutdown_tests {
 pub trait Config {
     type TransportOutput: TransportOutput;
     type Context<'c>: ShutdownState;
+
+    /// Handle one raw command payload from the front of `frame`.
+    ///
+    /// The default implementation preserves the current behavior by decoding
+    /// the leading VLQ command ID and then delegating to [`Self::dispatch`].
+    fn dispatch_raw<'c>(
+        frame: &mut &[u8],
+        context: &mut Self::Context<'c>,
+    ) -> Result<(), ReadError> {
+        let cmd = <u16 as Readable>::read(frame)?;
+        Self::dispatch(cmd, frame, context)
+    }
+
     fn dispatch<'c>(
         cmd: u16,
         frame: &mut &[u8],
@@ -190,8 +203,7 @@ impl<C: Config> Transport<C> {
         context: &mut C::Context<'c>,
     ) -> Result<(), ReadError> {
         while !frame.is_empty() {
-            let cmd = <u16 as Readable>::read(&mut frame)?;
-            C::dispatch(cmd, &mut frame, context)?;
+            C::dispatch_raw(&mut frame, context)?;
         }
         Ok(())
     }
