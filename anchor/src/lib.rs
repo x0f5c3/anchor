@@ -130,16 +130,11 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![allow(clippy::needless_doctest_main)]
 
-#[doc(hidden)]
 pub mod encoding;
-#[doc(hidden)]
 pub mod input_buffer;
-#[doc(hidden)]
 pub mod output_buffer;
 
-#[doc(hidden)]
 pub mod transport;
-#[doc(hidden)]
 pub mod transport_output;
 
 mod fifo_buffer;
@@ -150,3 +145,46 @@ pub use input_buffer::{InputBuffer, SliceInputBuffer};
 pub use output_buffer::{OutputBuffer, ScratchOutput};
 pub use transport::{ShutdownState, Transport};
 pub use transport_output::TransportOutput;
+
+// ── Protocol traits ──────────────────────────────────────────────────────────
+//
+// Re-exported at the crate root so users implementing virtual MCUs do not
+// need to reach into `anchor::transport::` or `anchor::encoding::`.
+
+/// Trait to implement for a custom virtual MCU configuration.
+///
+/// Implement this on a zero-sized marker struct and pass it to
+/// [`Transport::new`].  The two associated types wire up the output path
+/// and the context type for command handlers.
+pub use transport::Config;
+
+/// Error returned by [`Config::dispatch`] to signal a malformed frame.
+pub use encoding::ReadError;
+
+/// Trait for decoding VLQ-encoded command arguments from a frame slice.
+///
+/// Implemented for `u8`, `u16`, `u32`, `i16`, `i32`, `bool`, and `&[u8]`.
+/// Use it in [`Config::dispatch`] to read each argument:
+/// ```
+/// let offset = u32::read(frame)?;
+/// let count  = u8::read(frame)?;
+/// ```
+pub use encoding::Readable;
+
+/// Trait for encoding VLQ-encoded response arguments into an [`OutputBuffer`].
+///
+/// Implemented for the same integer types as [`Readable`], plus `bool` and
+/// `&[u8]`.  Since [`Vec<u8>`] implements [`OutputBuffer`] (with the `std`
+/// feature), you can build response payloads with plain method calls:
+///
+/// ```
+/// use anchor::Writable as _;      // bring .write() into scope
+/// use anchor::OutputBuffer as _;  // bring .output() into scope
+///
+/// let mut resp: Vec<u8> = Vec::new();
+/// (0u32).write(&mut resp);   // cmd = 0 (identify_response)
+/// offset.write(&mut resp);   // echo back the requested offset
+/// (len as u32).write(&mut resp);
+/// resp.extend_from_slice(chunk);
+/// ```
+pub use encoding::Writable;
